@@ -1,0 +1,4 @@
+[flake8]
+exclude = venv, __pycache__, .git, cookies.py
+indent-size = 2
+max-line-length = 120
