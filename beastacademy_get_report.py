@@ -5,8 +5,8 @@ from cookies import cookies, student_id  # the cookies credentials were taken fr
 
 # Beast academy has 5 levels, within that are x chapters, within that are y lessons, within that are z questions
 ba_level_chapters_map = {
-    'level_one': [78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88,
-                  89],  # level one has 12 chapters
+    # level one has 12 chapters
+    'level_one': [78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89],
     'level_two': [64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75],
     'level_three': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
     'level_four': [14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25],
@@ -32,7 +32,7 @@ ba_chapter_display_name = {
 def get_level_info(chapters):
     json_data = {'chapterIDs': chapters}
     url = 'https://beastacademy.com/api/report/getBlocks'
-    response = requests.post(url, cookies=cookies, json=json_data)
+    response = requests.post(url, cookies=cookies, json=json_data, timeout=30)
     result = response.json()
     return result
 
@@ -59,7 +59,8 @@ def get_chapter_report(chapter_id):
     response = requests.post(
         'https://beastacademy.com/api/report/getBlockResults',
         cookies=cookies,
-        json=json_data)
+        json=json_data,
+        timeout=30)
     return response.json()
 
 
@@ -133,12 +134,54 @@ def print_unmastered_lessons(chapter_report,
             print(msg)
 
 
-ba_level_one_info = get_level_info(ba_level_chapters_map['level_one'])
-lesson_chapter_dict = get_lesson_chapter_dict(ba_level_one_info)
+# Look at the lessons available in the report, if there are 0 return False
+# otherwise if lessons have been started, and there is a report for the chapter
+# return True
+def is_chapter_started(chapter_report):
+    qty_lessons_started = len(
+        chapter_report['students'][str(student_id)]['byBlockNumber'].keys())
+    if qty_lessons_started == 0:
+        return False
+    return True
 
-# My child is working on these 4 chapter currently. Eventually I'll just parse all of
-# ba_level_chapters_mapp['level_one']
-for chapter in [78, 79]:
-    chapter_report = get_chapter_report(chapter)
+
+# Take an array of chapter report data structures, then return an array of
+# chapter ids (integers)
+def get_chapter_ids(chapter_reports):
+    chapter_ids = []
+    for chapter_report in chapter_reports:
+        chapter_id = chapter_report['students'][str(
+            student_id)]['chapterTotals']['chapterID']
+        chapter_ids.append(chapter_id)
+    return chapter_ids
+
+
+# This parses all levels, then all the chapters from the levels, looking
+# for chapters that have not been started yet, then we stop parsing new chapter
+# and return the active chapter reports
+def get_all_active_chapter_reports(ba_level_chapters_map):
+    chapter_reports = []
+    for ba_level in ba_level_chapters_map.keys():
+        print(f"Getting the active chapters from Beast Academy {ba_level}")
+        for chapter in ba_level_chapters_map[ba_level]:
+            chapter_report = get_chapter_report(chapter)
+            if is_chapter_started(chapter_report) is False:
+                break
+            chapter_reports.append(chapter_report)
+        if is_chapter_started(chapter_report) is False:
+            break
+    return chapter_reports
+
+
+all_chapter_reports = get_all_active_chapter_reports(ba_level_chapters_map)
+active_chapter_ids = get_chapter_ids(all_chapter_reports)
+level_chapter_metadata = get_level_info(active_chapter_ids)
+lesson_chapter_dict = get_lesson_chapter_dict(level_chapter_metadata)
+
+for chapter_report in all_chapter_reports:
     print_unmastered_lessons(
         chapter_report['students'][str(student_id)]['byBlockNumber'])
+
+# make a get_lesson_reports function, to jumble all the lesson sets into one big array
+# make a remove_test_lesson
+# separate out the normal lesson and the weird corner case lessons "G" into separate bucks
