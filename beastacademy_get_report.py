@@ -29,6 +29,8 @@ ba_chapter_display_name = {
 }
 
 
+# This call gets us the 'chapter_name' information. We use this later
+# to be able to figure out which lesson_id belows to which chapter
 def get_level_info(chapters):
     json_data = {'chapterIDs': chapters}
     url = 'https://beastacademy.com/api/report/getBlocks'
@@ -37,7 +39,7 @@ def get_level_info(chapters):
     return result
 
 
-#  this dictionary lets me check a lesson_id, eg 1456, and I can get That
+#  this dictionary lets me check a lesson_id, eg 1456, and I can get that
 #  lesson metadata, find out it's named is "Groups", and that it's part of counting
 def get_lesson_chapter_dict(level_info):
     lesson_chapter_dict = {}
@@ -92,7 +94,7 @@ def get_percent_tries_correct(completed_lesson_attempts, last_tries=3):
 
 
 # Take an array of lessons, and remove any that aren't completed, then return the remainder.
-# BA seems to generate a lesson, if you click on it on the app, then never do any questions
+# BA seems to generate a lesson, if you click on it in the app, then never do any questions
 # Those get thrown away, also if you don't complete a lesson, we ignore those results
 def get_completed_lessons(lessons):
     completed_lessons = []
@@ -162,7 +164,8 @@ def get_chapter_ids(chapter_reports):
 def get_all_active_chapter_reports(ba_level_chapters_map):
     chapter_reports = []
     for ba_level in ba_level_chapters_map.keys():
-        print(f"Getting the active chapters from Beast Academy {ba_level}")
+        msg = f"#################### Getting the active chapters from beast academy {ba_level} ####################"
+        print(msg)
         for chapter in ba_level_chapters_map[ba_level]:
             chapter_report = get_chapter_report(chapter)
             if is_chapter_started(chapter_report) is False:
@@ -182,6 +185,10 @@ for chapter_report in all_chapter_reports:
     print_unmastered_lessons(
         chapter_report['students'][str(student_id)]['byBlockNumber'])
 
+# TODO
 # make a get_lesson_reports function, to jumble all the lesson sets into one big array
 # make a remove_test_lesson
 # separate out the normal lesson and the weird corner case lessons "G" into separate bucks
+# ideally I need to eliminate the ba_chapter_display_name variable, I should dynamically
+# generate this. I'm not sure where this data is stored in the API yet.
+# ditto^ for ba_level_chapters_ma
