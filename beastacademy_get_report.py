@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import requests
-from cookies import cookies, student_id  # the cookies credentials were taken from chrome inspector tool
+from secrets import cookies, student_id  # the cookies credentials were taken from chrome inspector tool
 from ba_constants import all_chapter_ids, ba_level_chapters_map
 
 
