@@ -25,8 +25,8 @@ def get_lesson_chapter_dict(level_info):
         for lesson in lessons:
             lesson_chapter_dict[lesson['id']] = lesson
             # add the chapter_name so I know which chapter a lesson is a part of
-            lesson_chapter_dict[lesson['id']][
-                'chapter_name'] = all_chapter_ids[chapter]
+            lesson_chapter_dict[
+                lesson['id']]['chapter_name'] = all_chapter_ids[chapter]
     return lesson_chapter_dict
 
 
@@ -170,7 +170,6 @@ all_chapter_reports = get_all_active_chapter_reports(ba_level_chapters_map)
 active_chapter_ids = get_chapter_ids(all_chapter_reports)
 level_chapter_metadata = get_level_info(active_chapter_ids)
 lesson_chapter_dict = get_lesson_chapter_dict(level_chapter_metadata)
-
 
 for chapter_report in all_chapter_reports:
     print_unmastered_lessons(
