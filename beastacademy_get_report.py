@@ -66,28 +66,41 @@ def get_chapter_report(chapter_id):
     return response.json()
 
 
+# For a typical lesson, take the set of questions/answers, and calculate
+# the percent correct.
+def get_percent_questions_correct(questions):
+    qty_correct = 0
+    for question in questions:
+        if question['outcome'] == 'correct' and len(question['trials']) == 1:
+            qty_correct = qty_correct + 1
+    return float(qty_correct) / len(questions)
+
+
+# These lessons/questions are a corner case. They are atypical as far as datastructures
+# returned by the API. They include counting/hands, counting/flashcards, and
+# other time based exercises, or ones with lots of rote practice, eg 80 rapid fire questions.
+def get_percent_rote_questions_correct(completed_lesson_attempt):
+    qty_correct = completed_lesson_attempt['progress']['problems'][0][
+        'customState']['numCorrect']
+    qty_questions = len(
+        completed_lesson_attempt['progress']['problems'][0]['trials'])
+    return float(qty_correct / qty_questions)
+
+
 # Take a lesson, and analyze the percent correct, for the last 3 tries, then return a float.
-def get_percent_tries_correct(completed_lesson_attempts, last_tries=3):
+def get_percent_lessons_correct(completed_lesson_attempts, last_tries=3):
     # How many questions are there total in the lesson
     completed_lesson_attempt_scores = []
     for completed_lesson_attempt in completed_lesson_attempts[:last_tries]:
         questions = completed_lesson_attempt['progress']['problems']
-        qty_questions = len(questions)
-        qty_correct = 0
+        # This 'G' means it's a weird corner case
         if completed_lesson_attempt['setNumber'] == 'G':
-            qty_correct = completed_lesson_attempt['progress']['problems'][0][
-                'customState']['numCorrect']
-            qty_questions = len(
-                completed_lesson_attempt['progress']['problems'][0]['trials'])
-            completed_lesson_attempt_scores.append(
-                float(qty_correct) / qty_questions)
+            questions_score = get_percent_rote_questions_correct(
+                completed_lesson_attempt)
+            completed_lesson_attempt_scores.append(questions_score)
             continue
-        for question in questions:
-            if question['outcome'] == 'correct' and len(
-                    question['trials']) == 1:
-                qty_correct = qty_correct + 1
-        completed_lesson_attempt_scores.append(
-            float(qty_correct) / qty_questions)
+        questions_score = get_percent_questions_correct(questions)
+        completed_lesson_attempt_scores.append(questions_score)
     average_correct_last_tries = sum(completed_lesson_attempt_scores) / len(
         completed_lesson_attempt_scores)
     return round(average_correct_last_tries, 3)
@@ -129,7 +142,8 @@ def print_unmastered_lessons(chapter_report,
             msg = f"{chapter_name} {lesson_name} has only been worked on {completed_lesson_attempts_qty} times"
             print(msg)
             continue
-        percent_correct = get_percent_tries_correct(completed_lesson_attempts)
+        percent_correct = get_percent_lessons_correct(
+            completed_lesson_attempts)
         if percent_correct < mastery_percent:
             # print out lessons which has the last 3 attempts below mastery
             msg = f"{chapter_name} {lesson_name} has an avg for the last {min_lessons} attempts at {percent_correct}"
@@ -186,9 +200,6 @@ for chapter_report in all_chapter_reports:
         chapter_report['students'][str(student_id)]['byBlockNumber'])
 
 # TODO
-# make a get_lesson_reports function, to jumble all the lesson sets into one big array
-# make a remove_test_lesson
-# separate out the normal lesson and the weird corner case lessons "G" into separate bucks
 # ideally I need to eliminate the ba_chapter_display_name variable, I should dynamically
 # generate this. I'm not sure where this data is stored in the API yet.
 # ditto^ for ba_level_chapters_ma
