@@ -2,31 +2,7 @@
 
 import requests
 from cookies import cookies, student_id  # the cookies credentials were taken from chrome inspector tool
-
-# Beast academy has 5 levels, within that are x chapters, within that are y lessons, within that are z questions
-ba_level_chapters_map = {
-    # level one has 12 chapters
-    'level_one': [78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89],
-    'level_two': [64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75],
-    'level_three': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-    'level_four': [14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25],
-    'level_five': [52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63]
-}
-
-ba_chapter_display_name = {
-    '78': 'Counting',
-    '79': 'Shapes',
-    '80': 'Comparing',
-    '81': 'Addition',
-    '82': 'Subtraction',
-    '83': 'Categories',
-    '84': 'Addition & Subtraction',
-    '85': 'Comparing',
-    '86': 'Patterns',
-    '87': 'Big Numbers',
-    '88': 'Measurement',
-    '89': 'Problem Solving'
-}
+from ba_constants import all_chapter_ids, ba_level_chapters_map
 
 
 # This call gets us the 'chapter_name' information. We use this later
@@ -50,7 +26,7 @@ def get_lesson_chapter_dict(level_info):
             lesson_chapter_dict[lesson['id']] = lesson
             # add the chapter_name so I know which chapter a lesson is a part of
             lesson_chapter_dict[lesson['id']][
-                'chapter_name'] = ba_chapter_display_name[chapter]
+                'chapter_name'] = all_chapter_ids[chapter]
     return lesson_chapter_dict
 
 
@@ -77,7 +53,7 @@ def get_percent_questions_correct(questions):
 
 
 # These lessons/questions are a corner case. They are atypical as far as datastructures
-# returned by the API. They include counting/hands, counting/flashcards, and
+# returned by the API. They include counting/hands, counting/flashcards, dice, ropeclimb and
 # other time based exercises, or ones with lots of rote practice, eg 80 rapid fire questions.
 def get_percent_rote_questions_correct(completed_lesson_attempt):
     qty_correct = completed_lesson_attempt['progress']['problems'][0][
@@ -195,11 +171,7 @@ active_chapter_ids = get_chapter_ids(all_chapter_reports)
 level_chapter_metadata = get_level_info(active_chapter_ids)
 lesson_chapter_dict = get_lesson_chapter_dict(level_chapter_metadata)
 
+
 for chapter_report in all_chapter_reports:
     print_unmastered_lessons(
         chapter_report['students'][str(student_id)]['byBlockNumber'])
-
-# TODO
-# ideally I need to eliminate the ba_chapter_display_name variable, I should dynamically
-# generate this. I'm not sure where this data is stored in the API yet.
-# ditto^ for ba_level_chapters_ma
