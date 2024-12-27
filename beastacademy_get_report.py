@@ -154,7 +154,7 @@ def get_chapter_ids(chapter_reports):
 def get_all_active_chapter_reports(ba_level_chapters_map):
     chapter_reports = []
     for ba_level in ba_level_chapters_map.keys():
-        msg = f"#################### Getting the active chapters from beast academy {ba_level} ####################"
+        msg = f"################## Getting the active chapters from beast academy {ba_level} ##################"
         print(msg)
         for chapter in ba_level_chapters_map[ba_level]:
             chapter_report = get_chapter_report(chapter)

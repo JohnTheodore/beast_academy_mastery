@@ -27,7 +27,7 @@ The Online Beast Academy has been an excellent resource for my four-year-old , w
 ```
 $ python beastacademy_get_report.py
 
-#################### Getting the active chapters from beast academy level_one ####################
+################## Getting the active chapters from beast academy level_one ##################
 Counting................. Match.................... has an avg for the last 3 attempts at 0.833
 Shapes................... Finish the Drawing....... has an avg for the last 3 attempts at 0.81
 Shapes................... Mirror Drawing 2......... has an avg for the last 3 attempts at 0.833
