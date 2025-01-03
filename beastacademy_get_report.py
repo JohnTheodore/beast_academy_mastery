@@ -95,10 +95,10 @@ def get_completed_lessons(lessons):
 
 # return a string, with the datetime for the last lesson
 def get_last_lesson_datetime(completed_lesson_attempts):
-    if len(completed_lesson_attempts) > 0 and 'finishedAt' in completed_lesson_attempts[0]:
+    if len(completed_lesson_attempts
+           ) > 0 and 'finishedAt' in completed_lesson_attempts[0]:
         return completed_lesson_attempts[0]['finishedAt'][:-8]
-    else:
-        return '................'
+    return '................'
 
 
 # This takes a datastructure as the input that we get from get_chapter_report
@@ -123,15 +123,16 @@ def print_unmastered_lessons(chapter_report,
         # You have to do a lesson a minimum number of times to have sufficient data for measuring mastery
         completed_lesson_attempts_qty = len(completed_lesson_attempts)
         last_lesson_time = get_last_lesson_datetime(completed_lesson_attempts)
+        prefix = f"{last_lesson_time} {chapter_name} {lesson_name} "
         if completed_lesson_attempts_qty < min_lessons:
-            msg = f"{last_lesson_time} {chapter_name} {lesson_name} has only been worked on {completed_lesson_attempts_qty} times"
+            msg = f"{prefix} has only been worked on {completed_lesson_attempts_qty} times"
             print(msg)
             continue
         percent_correct = get_percent_lessons_correct(
             completed_lesson_attempts)
         if percent_correct < mastery_percent:
             # print out lessons which has the last 3 attempts below mastery
-            msg = f"{last_lesson_time} {chapter_name} {lesson_name} has an avg for the last {min_lessons} attempts at {percent_correct}"
+            msg = f"{prefix} has an avg for the last {min_lessons} attempts at {percent_correct}"
             print(msg)
 
 
