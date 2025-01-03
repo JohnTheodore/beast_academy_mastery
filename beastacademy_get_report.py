@@ -52,15 +52,34 @@ def get_percent_questions_correct(questions):
     return float(qty_correct) / len(questions)
 
 
+# This is a corner case, where the lesson is time based, and you
+# could get 98% right, but you'll only have 1 star, because you took too long.
+# For these lessons types, we'll defer to the amount of stars.
+def get_fill_drill_score(completed_lesson_attempt, percent_correct):
+    stars = completed_lesson_attempt['stars']
+    if stars == 3:
+        return percent_correct
+    if stars == 2:
+        return .8
+    if stars == 1:
+        return .7
+    return .6
+
+
 # These lessons/questions are a corner case. They are atypical as far as datastructures
 # returned by the API. They include counting/hands, counting/flashcards, dice, ropeclimb and
 # other time based exercises, or ones with lots of rote practice, eg 80 rapid fire questions.
 def get_percent_rote_questions_correct(completed_lesson_attempt):
+    result_type = lesson_chapter_dict[
+        completed_lesson_attempt['objectID']]['setList']['resultType']
     qty_correct = completed_lesson_attempt['progress']['problems'][0][
         'customState']['numCorrect']
     qty_questions = len(
         completed_lesson_attempt['progress']['problems'][0]['trials'])
-    return float(qty_correct / qty_questions)
+    percent_correct = float(qty_correct / qty_questions)
+    if result_type == 'fillDrill':
+        return get_fill_drill_score(completed_lesson_attempt, percent_correct)
+    return percent_correct
 
 
 # Take a lesson, and analyze the percent correct, for the last 3 tries, then return a float.
@@ -184,3 +203,7 @@ lesson_chapter_dict = get_lesson_chapter_dict(level_chapter_metadata)
 for chapter_report in all_chapter_reports:
     print_unmastered_lessons(
         chapter_report['students'][str(student_id)]['byBlockNumber'])
+
+# TODO, deal with the time based lessons better, eg, "Smallest or Largest"
+# the way I do that scoring is wrong, since it doesn't factor in the time constraints
+# Look into trophies?
