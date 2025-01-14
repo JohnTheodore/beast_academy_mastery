@@ -96,6 +96,8 @@ def get_percent_lessons_correct(completed_lesson_attempts, last_tries=3):
             continue
         questions_score = get_percent_questions_correct(questions)
         completed_lesson_attempt_scores.append(questions_score)
+    if len(completed_lesson_attempt_scores) == 0:
+        return 0
     average_correct_last_tries = sum(completed_lesson_attempt_scores) / len(
         completed_lesson_attempt_scores)
     return round(average_correct_last_tries, 3)
@@ -124,10 +126,11 @@ def get_last_lesson_datetime(completed_lesson_attempts):
 # Then we'll feed it the results from say the Counting chapter (78)
 # This function will print any lessons that are below mastery learning (90%)
 # for the last 3 tries on average.
-def print_unmastered_lessons(chapter_report,
+def get_unmastered_lessons(chapter_report,
                              min_lessons=3,
-                             mastery_percent=.9):
+                             mastery_percent=.85):
     lessons = chapter_report.keys()
+    lesson_report_messages = []
     for lesson in lessons:
         if lesson == 'test':
             continue
@@ -143,16 +146,17 @@ def print_unmastered_lessons(chapter_report,
         completed_lesson_attempts_qty = len(completed_lesson_attempts)
         last_lesson_time = get_last_lesson_datetime(completed_lesson_attempts)
         prefix = f"{last_lesson_time} {chapter_name} {lesson_name} "
-        if completed_lesson_attempts_qty < min_lessons:
-            msg = f"{prefix} has only been worked on {completed_lesson_attempts_qty} times"
-            print(msg)
-            continue
         percent_correct = get_percent_lessons_correct(
             completed_lesson_attempts)
+        if completed_lesson_attempts_qty < min_lessons:
+            msg = f"{prefix} has only been worked on {completed_lesson_attempts_qty} times. {percent_correct}"
+            lesson_report_messages.append(msg)
+            continue
         if percent_correct < mastery_percent:
             # print out lessons which has the last 3 attempts below mastery
             msg = f"{prefix} has an avg for the last {min_lessons} attempts at {percent_correct}"
-            print(msg)
+            lesson_report_messages.append(msg)
+    return lesson_report_messages
 
 
 # Look at the lessons available in the report, if there are 0 return False
@@ -199,11 +203,13 @@ all_chapter_reports = get_all_active_chapter_reports(ba_level_chapters_map)
 active_chapter_ids = get_chapter_ids(all_chapter_reports)
 level_chapter_metadata = get_level_info(active_chapter_ids)
 lesson_chapter_dict = get_lesson_chapter_dict(level_chapter_metadata)
+unmastered_lessons_messages = []
 
 for chapter_report in all_chapter_reports:
-    print_unmastered_lessons(
-        chapter_report['students'][str(student_id)]['byBlockNumber'])
+    unmastered_lessons_message = get_unmastered_lessons(chapter_report['students'][str(student_id)]['byBlockNumber'])
+    if unmastered_lessons_message != []:
+        unmastered_lessons_messages = unmastered_lessons_messages + unmastered_lessons_message
 
-# TODO, deal with the time based lessons better, eg, "Smallest or Largest"
-# the way I do that scoring is wrong, since it doesn't factor in the time constraints
-# Look into trophies?
+unmastered_lessons_messages.sort()
+for unmastered_lessons_message in unmastered_lessons_messages:
+    print(unmastered_lessons_message)
