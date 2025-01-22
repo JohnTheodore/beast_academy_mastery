@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import requests
+import sys
 from secrets import cookies, student_id  # the cookies credentials were taken from chrome inspector tool
 from ba_constants import all_chapter_ids, ba_level_chapters_map
 
@@ -126,9 +127,7 @@ def get_last_lesson_datetime(completed_lesson_attempts):
 # Then we'll feed it the results from say the Counting chapter (78)
 # This function will print any lessons that are below mastery learning (90%)
 # for the last 3 tries on average.
-def get_unmastered_lessons(chapter_report,
-                             min_lessons=3,
-                             mastery_percent=.85):
+def get_unmastered_lessons(chapter_report, min_lessons=3, mastery_percent=.85):
     lessons = chapter_report.keys()
     lesson_report_messages = []
     for lesson in lessons:
@@ -149,13 +148,15 @@ def get_unmastered_lessons(chapter_report,
         percent_correct = get_percent_lessons_correct(
             completed_lesson_attempts)
         if completed_lesson_attempts_qty < min_lessons:
-            msg = f"{prefix} has only been worked on {completed_lesson_attempts_qty} times. {percent_correct}"
-            lesson_report_messages.append(msg)
+            lesson_report_messages.append(
+                f"{prefix} has only been worked on {completed_lesson_attempts_qty} times. {percent_correct}"
+            )
             continue
         if percent_correct < mastery_percent:
             # print out lessons which has the last 3 attempts below mastery
-            msg = f"{prefix} has an avg for the last {min_lessons} attempts at {percent_correct}"
-            lesson_report_messages.append(msg)
+            lesson_report_messages.append(
+                f"{prefix} has an avg for the last {min_lessons} attempts at {percent_correct}"
+            )
     return lesson_report_messages
 
 
@@ -163,6 +164,10 @@ def get_unmastered_lessons(chapter_report,
 # otherwise if lessons have been started, and there is a report for the chapter
 # return True
 def is_chapter_started(chapter_report):
+    if chapter_report['statusCode'] == 403:
+        msg = f"################## ERROR {chapter_report['error']} {chapter_report['message']} ##################"
+        print(msg)
+        sys.exit(1)
     qty_lessons_started = len(
         chapter_report['students'][str(student_id)]['byBlockNumber'].keys())
     if qty_lessons_started == 0:
@@ -206,8 +211,9 @@ lesson_chapter_dict = get_lesson_chapter_dict(level_chapter_metadata)
 unmastered_lessons_messages = []
 
 for chapter_report in all_chapter_reports:
-    unmastered_lessons_message = get_unmastered_lessons(chapter_report['students'][str(student_id)]['byBlockNumber'])
-    if unmastered_lessons_message != []:
+    unmastered_lessons_message = get_unmastered_lessons(
+        chapter_report['students'][str(student_id)]['byBlockNumber'])
+    if unmastered_lessons_message:
         unmastered_lessons_messages = unmastered_lessons_messages + unmastered_lessons_message
 
 unmastered_lessons_messages.sort()
