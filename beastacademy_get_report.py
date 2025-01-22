@@ -149,13 +149,13 @@ def get_unmastered_lessons(chapter_report, min_lessons=3, mastery_percent=.85):
             completed_lesson_attempts)
         if completed_lesson_attempts_qty < min_lessons:
             lesson_report_messages.append(
-                f"{prefix} has only been worked on {completed_lesson_attempts_qty} times. {percent_correct}"
+                f"{prefix} only worked on {completed_lesson_attempts_qty} attempts {percent_correct}"
             )
             continue
         if percent_correct < mastery_percent:
             # print out lessons which has the last 3 attempts below mastery
             lesson_report_messages.append(
-                f"{prefix} has an avg for the last {min_lessons} attempts at {percent_correct}"
+                f"{prefix} avg on the last {min_lessons} attempts {percent_correct}"
             )
     return lesson_report_messages
 
