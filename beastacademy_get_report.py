@@ -164,7 +164,7 @@ def get_unmastered_lessons(chapter_report, min_lessons=3, mastery_percent=.85):
 # otherwise if lessons have been started, and there is a report for the chapter
 # return True
 def is_chapter_started(chapter_report):
-    if chapter_report['statusCode'] == 403:
+    if 'statusCode' in chapter_report and chapter_report['statusCode'] == 403:
         msg = f"################## ERROR {chapter_report['error']} {chapter_report['message']} ##################"
         print(msg)
         sys.exit(1)
