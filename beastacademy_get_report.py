@@ -4,7 +4,7 @@ import argparse
 import requests
 import sys
 from secrets import cookies, student_id  # the cookies credentials were taken from chrome inspector tool
-from ba_constants import all_chapter_ids, all_chapter_names, ba_level_chapters_map
+from ba_constants import all_chapter_ids, ba_level_chapters_map
 
 
 # This call gets us the 'chapter_name' information. We use this later
@@ -130,7 +130,7 @@ def get_last_lesson_datetime(completed_lesson_attempts):
 # for the last 3 tries on average.
 def get_unmastered_lessons(chapter_report, min_lessons=3, mastery_percent=.85):
     lessons = chapter_report.keys()
-    lesson_report_messages = []
+    lesson_report_messages = {}
     for lesson in lessons:
         if lesson == 'test':
             continue
@@ -152,15 +152,11 @@ def get_unmastered_lessons(chapter_report, min_lessons=3, mastery_percent=.85):
         percent_correct = get_percent_lessons_correct(
             completed_lesson_attempts)
         if completed_lesson_attempts_qty < min_lessons:
-            lesson_report_messages.append(
-                f"{prefix} only worked on {completed_lesson_attempts_qty} attempts {percent_correct}"
-            )
+            lesson_report_messages[lesson_id] = f'{prefix} only worked on {completed_lesson_attempts_qty} attempts {percent_correct}'
             continue
         if percent_correct < mastery_percent:
             # print out lessons which has the last 3 attempts below mastery
-            lesson_report_messages.append(
-                f"{prefix} avg on the last {min_lessons} attempts {percent_correct}"
-            )
+            lesson_report_messages[lesson_id] = f'{prefix} avg on the last {min_lessons} attempts {percent_correct}'
     return lesson_report_messages
 
 
@@ -208,16 +204,23 @@ def get_all_active_chapter_reports(ba_level_chapters_map, chapter=None):
     return chapter_reports
 
 def main():
-    unmastered_lessons_messages = []
+    unmastered_chapter_messages = {}
     for chapter_report in all_chapter_reports:
-        unmastered_lessons_message = get_unmastered_lessons(
+        chapter_id = chapter_report['students'][str(student_id)]['chapterTotals']['chapterID']
+        unmastered_chapter_messages[chapter_id] = get_unmastered_lessons(
             chapter_report['students'][str(student_id)]['byBlockNumber'])
-        if unmastered_lessons_message:
-            unmastered_lessons_messages = unmastered_lessons_messages + unmastered_lessons_message
+    return unmastered_chapter_messages
 
-    unmastered_lessons_messages.sort()
-    for unmastered_lessons_message in unmastered_lessons_messages:
-        print(unmastered_lessons_message)
+def print_unmastered_lessons(unmastered_lessons_messages, level_chapter_metadata):
+    # I'll print the lessons, in the order they appear on the platform
+    for chapter in level_chapter_metadata['chapters'].keys():
+        chapter_int = int(chapter)
+        if unmastered_lessons_messages[chapter_int] == {}:
+            continue
+        for lesson in level_chapter_metadata['chapters'][chapter]['blocks']:
+            lesson_id = lesson['id']
+            if lesson_id in unmastered_lessons_messages[chapter_int]:
+                print(unmastered_lessons_messages[chapter_int][lesson_id])
 
 def main_with_args(args):
     chapter_id = int(args.chapter)
@@ -240,7 +243,8 @@ else:
 active_chapter_ids = get_chapter_ids(all_chapter_reports)
 level_chapter_metadata = get_level_info(active_chapter_ids)
 lesson_chapter_dict = get_lesson_chapter_dict(level_chapter_metadata)
-main()
+unmastered_lessons = main()
+print_unmastered_lessons(unmastered_lessons, level_chapter_metadata)
 
 # If they give 2 stars, and my score is >90%, I should down weight my score.
 # Add an option so I can look up a score for a particular lesson
