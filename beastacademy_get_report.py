@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 
+import argparse
 import requests
 import sys
 from secrets import cookies, student_id  # the cookies credentials were taken from chrome inspector tool
-from ba_constants import all_chapter_ids, ba_level_chapters_map
+from ba_constants import all_chapter_ids, all_chapter_names, ba_level_chapters_map
 
 
 # This call gets us the 'chapter_name' information. We use this later
@@ -138,7 +139,10 @@ def get_unmastered_lessons(chapter_report, min_lessons=3, mastery_percent=.85):
             25, ".")
         chapter_name = lesson_chapter_dict[lesson_id]['chapter_name'].ljust(
             25, ".")
-        lesson_attempted_tries = chapter_report[lesson]['results']
+        if 'results' in chapter_report[lesson]:
+            lesson_attempted_tries = chapter_report[lesson]['results']
+        else:
+            lesson_attempted_tries = []
         completed_lesson_attempts = get_completed_lessons(
             lesson_attempted_tries)
         # You have to do a lesson a minimum number of times to have sufficient data for measuring mastery
@@ -189,7 +193,7 @@ def get_chapter_ids(chapter_reports):
 # This parses all levels, then all the chapters from the levels, looking
 # for chapters that have not been started yet, then we stop parsing new chapter
 # and return the active chapter reports
-def get_all_active_chapter_reports(ba_level_chapters_map):
+def get_all_active_chapter_reports(ba_level_chapters_map, chapter=None):
     chapter_reports = []
     for ba_level in ba_level_chapters_map.keys():
         msg = f"################## Getting the active chapters from beast academy {ba_level} ##################"
@@ -203,19 +207,40 @@ def get_all_active_chapter_reports(ba_level_chapters_map):
             break
     return chapter_reports
 
+def main():
+    unmastered_lessons_messages = []
+    for chapter_report in all_chapter_reports:
+        unmastered_lessons_message = get_unmastered_lessons(
+            chapter_report['students'][str(student_id)]['byBlockNumber'])
+        if unmastered_lessons_message:
+            unmastered_lessons_messages = unmastered_lessons_messages + unmastered_lessons_message
 
-all_chapter_reports = get_all_active_chapter_reports(ba_level_chapters_map)
+    unmastered_lessons_messages.sort()
+    for unmastered_lessons_message in unmastered_lessons_messages:
+        print(unmastered_lessons_message)
+
+def main_with_args(args):
+    chapter_id = int(args.chapter)
+    chapter_report = get_chapter_report(chapter_id)
+    if is_chapter_started(chapter_report) is False:
+        print("Chapter has not been started")
+        sys.exit()
+    return [chapter_report]
+
+parser = argparse.ArgumentParser(description="Run specific functions based on flags")
+parser.add_argument("--chapter", type=str, help="Specify the chapter to get report")
+args = parser.parse_args()
+
+if args.chapter:
+    all_chapter_reports = main_with_args(args)
+else:
+    all_chapter_reports = get_all_active_chapter_reports(ba_level_chapters_map)
+
+
 active_chapter_ids = get_chapter_ids(all_chapter_reports)
 level_chapter_metadata = get_level_info(active_chapter_ids)
 lesson_chapter_dict = get_lesson_chapter_dict(level_chapter_metadata)
-unmastered_lessons_messages = []
+main()
 
-for chapter_report in all_chapter_reports:
-    unmastered_lessons_message = get_unmastered_lessons(
-        chapter_report['students'][str(student_id)]['byBlockNumber'])
-    if unmastered_lessons_message:
-        unmastered_lessons_messages = unmastered_lessons_messages + unmastered_lessons_message
-
-unmastered_lessons_messages.sort()
-for unmastered_lessons_message in unmastered_lessons_messages:
-    print(unmastered_lessons_message)
+# If they give 2 stars, and my score is >90%, I should down weight my score.
+# Add an option so I can look up a score for a particular lesson
