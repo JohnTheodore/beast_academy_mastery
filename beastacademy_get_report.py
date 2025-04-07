@@ -152,8 +152,9 @@ def get_unmastered_lessons(chapter_report, min_lessons=3, mastery_percent=.85):
         percent_correct = get_percent_lessons_correct(
             completed_lesson_attempts)
         if completed_lesson_attempts_qty < min_lessons:
-            lesson_report_messages[
-                lesson_id] = f'{prefix} only worked on {completed_lesson_attempts_qty} attempts {percent_correct * 100:.1f}'
+            lesson_report_messages[lesson_id] = f'{prefix} only worked \
+                on {completed_lesson_attempts_qty} attempts {percent_correct * 100:.1f}'
+
             continue
         if percent_correct < mastery_percent:
             # print out lessons which has the last 3 attempts below mastery
@@ -191,7 +192,7 @@ def get_chapter_ids(chapter_reports):
 # This parses all levels, then all the chapters from the levels, looking
 # for chapters that have not been started yet, then we stop parsing new chapter
 # and return the active chapter reports
-def get_all_active_chapter_reports(ba_level_chapters_map, chapter=None):
+def get_all_active_chapter_reports(ba_level_chapters_map):
     chapter_reports = []
     for ba_level in ba_level_chapters_map.keys():
         msg = f"################## Getting the active chapters from beast academy {ba_level} ##################"
