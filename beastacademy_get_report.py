@@ -152,11 +152,13 @@ def get_unmastered_lessons(chapter_report, min_lessons=3, mastery_percent=.85):
         percent_correct = get_percent_lessons_correct(
             completed_lesson_attempts)
         if completed_lesson_attempts_qty < min_lessons:
-            lesson_report_messages[lesson_id] = f'{prefix} only worked on {completed_lesson_attempts_qty} attempts {percent_correct * 100:.1f}'
+            lesson_report_messages[
+                lesson_id] = f'{prefix} only worked on {completed_lesson_attempts_qty} attempts {percent_correct * 100:.1f}'
             continue
         if percent_correct < mastery_percent:
             # print out lessons which has the last 3 attempts below mastery
-            lesson_report_messages[lesson_id] = f'{prefix} avg on the last {min_lessons} attempts {percent_correct * 100:.1f}'
+            lesson_report_messages[
+                lesson_id] = f'{prefix} avg on the last {min_lessons} attempts {percent_correct * 100:.1f}'
     return lesson_report_messages
 
 
@@ -194,8 +196,8 @@ def get_all_active_chapter_reports(ba_level_chapters_map, chapter=None):
     for ba_level in ba_level_chapters_map.keys():
         msg = f"################## Getting the active chapters from beast academy {ba_level} ##################"
         print(msg)
-        for chapter in ba_level_chapters_map[ba_level]:
-            chapter_report = get_chapter_report(chapter)
+        for chapter_id in ba_level_chapters_map[ba_level]:
+            chapter_report = get_chapter_report(chapter_id)
             if is_chapter_started(chapter_report) is False:
                 break
             chapter_reports.append(chapter_report)
@@ -203,15 +205,19 @@ def get_all_active_chapter_reports(ba_level_chapters_map, chapter=None):
             break
     return chapter_reports
 
+
 def main():
     unmastered_chapter_messages = {}
     for chapter_report in all_chapter_reports:
-        chapter_id = chapter_report['students'][str(student_id)]['chapterTotals']['chapterID']
+        chapter_id = chapter_report['students'][str(
+            student_id)]['chapterTotals']['chapterID']
         unmastered_chapter_messages[chapter_id] = get_unmastered_lessons(
             chapter_report['students'][str(student_id)]['byBlockNumber'])
     return unmastered_chapter_messages
 
-def print_unmastered_lessons(unmastered_lessons_messages, level_chapter_metadata):
+
+def print_unmastered_lessons(unmastered_lessons_messages,
+                             level_chapter_metadata):
     # I'll print the lessons, in the order they appear on the platform
     for chapter in level_chapter_metadata['chapters'].keys():
         chapter_int = int(chapter)
@@ -222,6 +228,7 @@ def print_unmastered_lessons(unmastered_lessons_messages, level_chapter_metadata
             if lesson_id in unmastered_lessons_messages[chapter_int]:
                 print(unmastered_lessons_messages[chapter_int][lesson_id])
 
+
 def main_with_args(args):
     chapter_id = int(args.chapter)
     chapter_report = get_chapter_report(chapter_id)
@@ -230,15 +237,18 @@ def main_with_args(args):
         sys.exit()
     return [chapter_report]
 
-parser = argparse.ArgumentParser(description="Run specific functions based on flags")
-parser.add_argument("--chapter", type=str, help="Specify the chapter to get report")
+
+parser = argparse.ArgumentParser(
+    description="Run specific functions based on flags")
+parser.add_argument("--chapter",
+                    type=str,
+                    help="Specify the chapter to get report")
 args = parser.parse_args()
 
 if args.chapter:
     all_chapter_reports = main_with_args(args)
 else:
     all_chapter_reports = get_all_active_chapter_reports(ba_level_chapters_map)
-
 
 active_chapter_ids = get_chapter_ids(all_chapter_reports)
 level_chapter_metadata = get_level_info(active_chapter_ids)
