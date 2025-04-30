@@ -124,6 +124,20 @@ def get_last_lesson_datetime(completed_lesson_attempts):
     return '................'
 
 
+def get_fastest_lesson_time(lesson, chapter_report):
+    time = ''
+    if 'results' not in chapter_report[lesson]:
+        return time
+    for lesson_result in chapter_report[lesson]['results']:
+        lesson_time_spent_secs = float(lesson_result['timeSpent'])
+        mins = round(lesson_time_spent_secs / 60)
+        if time == '':
+            time = mins
+        if mins < time:
+            time = mins
+    return str(time)
+
+
 # This takes a datastructure as the input that we get from get_chapter_report
 # Then we'll feed it the results from say the Counting chapter (78)
 # This function will print any lessons that are below mastery learning (90%)
@@ -135,6 +149,7 @@ def get_unmastered_lessons(chapter_report, min_lessons=3, mastery_percent=.85):
         if lesson == 'test':
             continue
         lesson_id = chapter_report[lesson]['blockID']
+        fastest_lesson_time = get_fastest_lesson_time(lesson, chapter_report)
         lesson_name = lesson_chapter_dict[lesson_id]['displayName'].ljust(
             25, ".")
         chapter_name = lesson_chapter_dict[lesson_id]['chapter_name'].ljust(
@@ -152,14 +167,14 @@ def get_unmastered_lessons(chapter_report, min_lessons=3, mastery_percent=.85):
         percent_correct = get_percent_lessons_correct(
             completed_lesson_attempts)
         if completed_lesson_attempts_qty < min_lessons:
-            lesson_report_messages[lesson_id] = f'{prefix} only worked \
-                on {completed_lesson_attempts_qty} attempts {percent_correct * 100:.1f}'
+            lesson_report_messages[
+                lesson_id] = f'{prefix} only worked on {completed_lesson_attempts_qty} attempts; fastest time: {fastest_lesson_time} mins; percent correct: {percent_correct * 100:.1f}'
 
             continue
         if percent_correct < mastery_percent:
             # print out lessons which has the last 3 attempts below mastery
             lesson_report_messages[
-                lesson_id] = f'{prefix} avg on the last {min_lessons} attempts {percent_correct * 100:.1f}'
+                lesson_id] = f'{prefix} avg on the last {min_lessons} attempts; fastest time: {fastest_lesson_time} mins; percent correct: {percent_correct * 100:.1f}'
     return lesson_report_messages
 
 
@@ -195,8 +210,6 @@ def get_chapter_ids(chapter_reports):
 def get_all_active_chapter_reports(ba_level_chapters_map):
     chapter_reports = []
     for ba_level in ba_level_chapters_map.keys():
-        msg = f"################## Getting the active chapters from beast academy {ba_level} ##################"
-        print(msg)
         for chapter_id in ba_level_chapters_map[ba_level]:
             chapter_report = get_chapter_report(chapter_id)
             if is_chapter_started(chapter_report) is False:
@@ -204,6 +217,8 @@ def get_all_active_chapter_reports(ba_level_chapters_map):
             chapter_reports.append(chapter_report)
         if is_chapter_started(chapter_report) is False:
             break
+        msg = f"################## Getting the active chapters from beast academy {ba_level} ##################"
+        print(msg)
     return chapter_reports
 
 
