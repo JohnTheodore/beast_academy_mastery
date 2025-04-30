@@ -169,15 +169,18 @@ def get_unmastered_lessons(chapter_report, min_lessons=3, mastery_percent=.85):
         prefix = f"{last_lesson_time} {chapter_name} {lesson_name} "
         percent_correct = get_percent_lessons_correct(
             completed_lesson_attempts)
+        fastest_time_msg = f'fastest time: {fastest_lesson_time} mins;'.ljust(25, " ")
         if completed_lesson_attempts_qty < min_lessons:
+            attempts_msg = f'only worked on {completed_lesson_attempts_qty} attempts;'.ljust(27, " ")
             lesson_report_messages[
-                lesson_id] = f'{prefix} only worked on {completed_lesson_attempts_qty} attempts; fastest time: {fastest_lesson_time} mins; percent correct: {percent_correct * 100:.1f}'
+                lesson_id] = f'{prefix} {attempts_msg} {fastest_time_msg} percent correct: {percent_correct * 100:.1f}'
 
             continue
         if percent_correct < mastery_percent:
             # print out lessons which has the last 3 attempts below mastery
+            attempts_msg = f'avg on the last {min_lessons} attempts;'.ljust(27, " ")
             lesson_report_messages[
-                lesson_id] = f'{prefix} avg on the last {min_lessons} attempts; fastest time: {fastest_lesson_time} mins; percent correct: {percent_correct * 100:.1f}'
+                lesson_id] = f'{prefix} {attempts_msg} {fastest_time_msg} percent correct: {percent_correct * 100:.1f}'
     return lesson_report_messages
 
 
