@@ -125,13 +125,16 @@ def get_last_lesson_datetime(completed_lesson_attempts):
 
 
 def get_fastest_lesson_time(lesson, chapter_report):
-    time = ''
+    time = 'none'
     if 'results' not in chapter_report[lesson]:
         return time
     for lesson_result in chapter_report[lesson]['results']:
+        # this ensures we only check lesson times for completed lessons
+        if lesson_result['percentComplete'] != 1:
+            continue
         lesson_time_spent_secs = float(lesson_result['timeSpent'])
         mins = round(lesson_time_spent_secs / 60)
-        if time == '':
+        if time == 'none':
             time = mins
         if mins < time:
             time = mins
