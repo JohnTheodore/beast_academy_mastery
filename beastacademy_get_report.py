@@ -145,13 +145,14 @@ def get_fastest_lesson_time(lesson, chapter_report):
 # Then we'll feed it the results from say the Counting chapter (78)
 # This function will print any lessons that are below mastery learning (90%)
 # for the last 3 tries on average.
-def get_unmastered_lessons(chapter_report, min_lessons=3, mastery_percent=.85):
+def get_unmastered_lessons(chapter_report, chapter_id, min_lessons=3, mastery_percent=.85):
     lessons = chapter_report.keys()
     lesson_report_messages = {}
     for lesson in lessons:
+        lesson_id = chapter_report[lesson]['blockID']
+        level_name = get_level_name(chapter_id)
         if lesson == 'test':
             continue
-        lesson_id = chapter_report[lesson]['blockID']
         fastest_lesson_time = get_fastest_lesson_time(lesson, chapter_report)
         lesson_name = lesson_chapter_dict[lesson_id]['displayName'].ljust(
             25, ".")
@@ -166,7 +167,7 @@ def get_unmastered_lessons(chapter_report, min_lessons=3, mastery_percent=.85):
         # You have to do a lesson a minimum number of times to have sufficient data for measuring mastery
         completed_lesson_attempts_qty = len(completed_lesson_attempts)
         last_lesson_time = get_last_lesson_datetime(completed_lesson_attempts)
-        prefix = f"{last_lesson_time} {chapter_name} {lesson_name} "
+        prefix = f"{last_lesson_time} {level_name} {chapter_name} {lesson_name} "
         percent_correct = get_percent_lessons_correct(
             completed_lesson_attempts)
         fastest_time_msg = f'fastest time: {fastest_lesson_time} mins'.ljust(25, " ")
@@ -199,6 +200,15 @@ def is_chapter_started(chapter_report):
     return True
 
 
+# get the level name for a lesson_id
+def get_level_name(lesson_id):
+    level_name = 'NA'
+    for level in ba_level_chapters_map.keys():
+        if lesson_id in ba_level_chapters_map[level]:
+            level_name = level
+            break
+    return level
+
 # Take an array of chapter report data structures, then return an array of
 # chapter ids (integers)
 def get_chapter_ids(chapter_reports):
@@ -223,8 +233,6 @@ def get_all_active_chapter_reports(ba_level_chapters_map):
             chapter_reports.append(chapter_report)
         if is_chapter_started(chapter_report) is False:
             break
-        msg = f"################## Getting the active chapters from beast academy {ba_level} ##################"
-        print(msg)
     return chapter_reports
 
 
@@ -234,7 +242,7 @@ def main():
         chapter_id = chapter_report['students'][str(
             student_id)]['chapterTotals']['chapterID']
         unmastered_chapter_messages[chapter_id] = get_unmastered_lessons(
-            chapter_report['students'][str(student_id)]['byBlockNumber'])
+            chapter_report['students'][str(student_id)]['byBlockNumber'], chapter_id)
     return unmastered_chapter_messages
 
 
@@ -279,4 +287,4 @@ unmastered_lessons = main()
 print_unmastered_lessons(unmastered_lessons, level_chapter_metadata)
 
 # If they give 2 stars, and my score is >90%, I should down weight my score.
-# Add an option so I can look up a score for a particular lesson
+# print out the score for a lesson, even if it's >85%, but use green/red/yellow colors?
