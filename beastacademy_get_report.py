@@ -5,6 +5,7 @@ import requests
 import sys
 from secrets import cookies, student_id  # the cookies credentials were taken from chrome inspector tool
 from ba_constants import all_chapter_ids, ba_level_chapters_map
+from colorama import Fore
 
 
 # This call gets us the 'chapter_name' information. We use this later
@@ -175,15 +176,17 @@ def get_unmastered_lessons(chapter_report, chapter_id, min_lessons=3, mastery_pe
         if completed_lesson_attempts_qty < min_lessons:
             attempts_msg = f'only worked on {completed_lesson_attempts_qty} attempts'.ljust(27, " ")
             lesson_report_messages[
-                lesson_id] = f'{prefix} {attempts_msg} {fastest_time_msg} percent correct: {percent_correct * 100:.1f}'
-
+                lesson_id] = {'mastered': False, 'msg': f'{prefix} {attempts_msg} {fastest_time_msg} percent correct: {percent_correct * 100:.1f}'}
             continue
+        # print out lessons which has the last 3 attempts below mastery
+        attempts_msg = f'avg on the last {min_lessons} attempts'.ljust(27, " ")
+        lesson_report_messages[
+            lesson_id] = {'msg': f'{prefix} {attempts_msg} {fastest_time_msg} percent correct: {percent_correct * 100:.1f}'}
         if percent_correct < mastery_percent:
-            # print out lessons which has the last 3 attempts below mastery
-            attempts_msg = f'avg on the last {min_lessons} attempts'.ljust(27, " ")
-            lesson_report_messages[
-                lesson_id] = f'{prefix} {attempts_msg} {fastest_time_msg} percent correct: {percent_correct * 100:.1f}'
+            lesson_report_messages[lesson_id]['mastered'] = False
         else:
+            lesson_report_messages[lesson_id]['mastered'] = True
+
             mastered_lessons += 1
     if get_mastered_qty == True:
         return mastered_lessons
@@ -261,7 +264,10 @@ def print_unmastered_lessons(unmastered_lessons_messages,
         for lesson in level_chapter_metadata['chapters'][chapter]['blocks']:
             lesson_id = lesson['id']
             if lesson_id in unmastered_lessons_messages[chapter_int]:
-                print(unmastered_lessons_messages[chapter_int][lesson_id])
+                if unmastered_lessons_messages[chapter_int][lesson_id]['mastered'] == True:
+                    print(Fore.GREEN + unmastered_lessons_messages[chapter_int][lesson_id]['msg'])
+                else:
+                    print(Fore.RED + unmastered_lessons_messages[chapter_int][lesson_id]['msg'])
 
 
 def main_with_args(args):
