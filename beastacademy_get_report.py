@@ -145,9 +145,10 @@ def get_fastest_lesson_time(lesson, chapter_report):
 # Then we'll feed it the results from say the Counting chapter (78)
 # This function will print any lessons that are below mastery learning (90%)
 # for the last 3 tries on average.
-def get_unmastered_lessons(chapter_report, chapter_id, min_lessons=3, mastery_percent=.85):
+def get_unmastered_lessons(chapter_report, chapter_id, min_lessons=3, mastery_percent=.832, get_mastered_qty=False):
     lessons = chapter_report.keys()
     lesson_report_messages = {}
+    mastered_lessons = 0
     for lesson in lessons:
         lesson_id = chapter_report[lesson]['blockID']
         level_name = get_level_name(chapter_id)
@@ -182,6 +183,10 @@ def get_unmastered_lessons(chapter_report, chapter_id, min_lessons=3, mastery_pe
             attempts_msg = f'avg on the last {min_lessons} attempts'.ljust(27, " ")
             lesson_report_messages[
                 lesson_id] = f'{prefix} {attempts_msg} {fastest_time_msg} percent correct: {percent_correct * 100:.1f}'
+        else:
+            mastered_lessons += 1
+    if get_mastered_qty == True:
+        return mastered_lessons
     return lesson_report_messages
 
 
@@ -284,6 +289,15 @@ active_chapter_ids = get_chapter_ids(all_chapter_reports)
 level_chapter_metadata = get_level_info(active_chapter_ids)
 lesson_chapter_dict = get_lesson_chapter_dict(level_chapter_metadata)
 unmastered_lessons = main()
+
+# This if statement tells me how many of the lessons from the chapter were mastered.
+if args.chapter:
+    chapter_id = int(args.chapter)
+    # it's a -1, because the test is removed.
+    lesson_qty = len(level_chapter_metadata['chapters'][args.chapter]['blocks']) -1
+    chapter_report = all_chapter_reports[0]['students'][str(student_id)]['byBlockNumber']
+    mastered_lessons = get_unmastered_lessons(chapter_report, chapter_id, get_mastered_qty=True)
+    print(f"{mastered_lessons} out of {lesson_qty} lessons mastered.")
 print_unmastered_lessons(unmastered_lessons, level_chapter_metadata)
 
 # If they give 2 stars, and my score is >90%, I should down weight my score.
