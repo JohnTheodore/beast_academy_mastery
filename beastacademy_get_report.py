@@ -146,7 +146,11 @@ def get_fastest_lesson_time(lesson, chapter_report):
 # Then we'll feed it the results from say the Counting chapter (78)
 # This function will print any lessons that are below mastery learning (90%)
 # for the last 3 tries on average.
-def get_unmastered_lessons(chapter_report, chapter_id, min_lessons=3, mastery_percent=.832, get_mastered_qty=False):
+def get_unmastered_lessons(chapter_report,
+                           chapter_id,
+                           min_lessons=3,
+                           mastery_percent=.832,
+                           get_mastered_qty=False):
     lessons = chapter_report.keys()
     lesson_report_messages = {}
     mastered_lessons = 0
@@ -172,16 +176,24 @@ def get_unmastered_lessons(chapter_report, chapter_id, min_lessons=3, mastery_pe
         prefix = f"{last_lesson_time} {level_name} {chapter_name} {lesson_name} "
         percent_correct = get_percent_lessons_correct(
             completed_lesson_attempts)
-        fastest_time_msg = f'fastest time: {fastest_lesson_time} mins'.ljust(25, " ")
+        fastest_time_msg = f'fastest time: {fastest_lesson_time} mins'.ljust(
+            25, " ")
         if completed_lesson_attempts_qty < min_lessons:
-            attempts_msg = f'only worked on {completed_lesson_attempts_qty} attempts'.ljust(27, " ")
-            lesson_report_messages[
-                lesson_id] = {'mastered': False, 'msg': f'{prefix} {attempts_msg} {fastest_time_msg} percent correct: {percent_correct * 100:.1f}'}
+            attempts_msg = f'only worked on {completed_lesson_attempts_qty} attempts'.ljust(
+                27, " ")
+            lesson_report_messages[lesson_id] = {
+                'mastered':
+                False,
+                'msg':
+                f'{prefix} {attempts_msg} {fastest_time_msg} percent correct: {percent_correct * 100:.1f}'
+            }
             continue
         # print out lessons which has the last 3 attempts below mastery
         attempts_msg = f'avg on the last {min_lessons} attempts'.ljust(27, " ")
-        lesson_report_messages[
-            lesson_id] = {'msg': f'{prefix} {attempts_msg} {fastest_time_msg} percent correct: {percent_correct * 100:.1f}'}
+        lesson_report_messages[lesson_id] = {
+            'msg':
+            f'{prefix} {attempts_msg} {fastest_time_msg} percent correct: {percent_correct * 100:.1f}'
+        }
         if percent_correct < mastery_percent:
             lesson_report_messages[lesson_id]['mastered'] = False
         else:
@@ -217,6 +229,7 @@ def get_level_name(lesson_id):
             break
     return level
 
+
 # Take an array of chapter report data structures, then return an array of
 # chapter ids (integers)
 def get_chapter_ids(chapter_reports):
@@ -250,7 +263,8 @@ def main():
         chapter_id = chapter_report['students'][str(
             student_id)]['chapterTotals']['chapterID']
         unmastered_chapter_messages[chapter_id] = get_unmastered_lessons(
-            chapter_report['students'][str(student_id)]['byBlockNumber'], chapter_id)
+            chapter_report['students'][str(student_id)]['byBlockNumber'],
+            chapter_id)
     return unmastered_chapter_messages
 
 
@@ -264,10 +278,13 @@ def print_unmastered_lessons(unmastered_lessons_messages,
         for lesson in level_chapter_metadata['chapters'][chapter]['blocks']:
             lesson_id = lesson['id']
             if lesson_id in unmastered_lessons_messages[chapter_int]:
-                if unmastered_lessons_messages[chapter_int][lesson_id]['mastered'] == True:
-                    print(Fore.GREEN + unmastered_lessons_messages[chapter_int][lesson_id]['msg'])
+                if unmastered_lessons_messages[chapter_int][lesson_id][
+                        'mastered'] == True:
+                    print(Fore.GREEN + unmastered_lessons_messages[chapter_int]
+                          [lesson_id]['msg'])
                 else:
-                    print(Fore.RED + unmastered_lessons_messages[chapter_int][lesson_id]['msg'])
+                    print(Fore.RED + unmastered_lessons_messages[chapter_int]
+                          [lesson_id]['msg'])
 
 
 def main_with_args(args):
@@ -300,9 +317,13 @@ unmastered_lessons = main()
 if args.chapter:
     chapter_id = int(args.chapter)
     # it's a -1, because the test is removed.
-    lesson_qty = len(level_chapter_metadata['chapters'][args.chapter]['blocks']) -1
-    chapter_report = all_chapter_reports[0]['students'][str(student_id)]['byBlockNumber']
-    mastered_lessons = get_unmastered_lessons(chapter_report, chapter_id, get_mastered_qty=True)
+    lesson_qty = len(
+        level_chapter_metadata['chapters'][args.chapter]['blocks']) - 1
+    chapter_report = all_chapter_reports[0]['students'][str(
+        student_id)]['byBlockNumber']
+    mastered_lessons = get_unmastered_lessons(chapter_report,
+                                              chapter_id,
+                                              get_mastered_qty=True)
     print(f"{mastered_lessons} out of {lesson_qty} lessons mastered.")
 print_unmastered_lessons(unmastered_lessons, level_chapter_metadata)
 
