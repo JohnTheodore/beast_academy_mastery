@@ -1,331 +1,182 @@
 #!/usr/bin/env python3
-
 import argparse
 import requests
 import sys
-from secrets import cookies, student_id  # the cookies credentials were taken from chrome inspector tool
+
+from secrets import cookies, student_id
 from ba_constants import all_chapter_ids, ba_level_chapters_map
 from colorama import Fore
 
+API_BLOCKS_URL = "https://beastacademy.com/api/report/getBlocks"
+API_RESULTS_URL = "https://beastacademy.com/api/report/getBlockResults"
 
-# This call gets us the 'chapter_name' information. We use this later
-# to be able to figure out which lesson_id belows to which chapter
-def get_level_info(chapters):
-    json_data = {'chapterIDs': chapters}
-    url = 'https://beastacademy.com/api/report/getBlocks'
-    response = requests.post(url, cookies=cookies, json=json_data, timeout=30)
-    result = response.json()
-    return result
+def fetch_level_info(chapter_ids):
+    payload = {'chapterIDs': chapter_ids}
+    resp = requests.post(API_BLOCKS_URL, cookies=cookies, json=payload, timeout=30)
+    resp.raise_for_status()
+    return resp.json()
 
+def map_lesson_to_chapter(level_info):
+    lesson_map = {}
+    for chap_id, chap_data in level_info['chapters'].items():
+        chapter_name = all_chapter_ids[chap_id]
+        for block in chap_data['blocks']:
+            lesson_id = block['id']
+            lesson_info = block.copy()
+            lesson_info['chapter_name'] = chapter_name
+            lesson_map[lesson_id] = lesson_info
+    return lesson_map
 
-#  this dictionary lets me check a lesson_id, eg 1456, and I can get that
-#  lesson metadata, find out it's named is "Groups", and that it's part of counting
-def get_lesson_chapter_dict(level_info):
-    lesson_chapter_dict = {}
-    chapters = level_info['chapters'].keys()
-    for chapter in chapters:
-        lessons = level_info['chapters'][chapter]['blocks']
-        for lesson in lessons:
-            lesson_chapter_dict[lesson['id']] = lesson
-            # add the chapter_name so I know which chapter a lesson is a part of
-            lesson_chapter_dict[
-                lesson['id']]['chapter_name'] = all_chapter_ids[chapter]
-    return lesson_chapter_dict
+def fetch_chapter_report(chapter_id):
+    payload = {'chapterID': chapter_id, 'studentIDs': [student_id]}
+    resp = requests.post(API_RESULTS_URL, cookies=cookies, json=payload, timeout=30)
+    resp.raise_for_status()
+    return resp.json()
 
+def compute_simple_correct_rate(questions):
+    correct = sum(1 for q in questions if q['outcome'] == 'correct' and len(q.get('trials', [])) == 1)
+    return float(correct) / len(questions) if questions else 0.0
 
-# This will get me all of the results for lessons and questions, from
-# a chapter, eg "Counting" (78). It takes an input integer like 78
-def get_chapter_report(chapter_id):
-    json_data = {'chapterID': chapter_id, 'studentIDs': [student_id]}
-    response = requests.post(
-        'https://beastacademy.com/api/report/getBlockResults',
-        cookies=cookies,
-        json=json_data,
-        timeout=30)
-    return response.json()
+def compute_fill_drill_score(attempt, percent_correct):
+    stars = attempt.get('stars', 0)
+    return {3: percent_correct, 2: .8, 1: .7}.get(stars, .6)
 
-
-# For a typical lesson, take the set of questions/answers, and calculate
-# the percent correct.
-def get_percent_questions_correct(questions):
-    qty_correct = 0
-    for question in questions:
-        if question['outcome'] == 'correct' and len(question['trials']) == 1:
-            qty_correct = qty_correct + 1
-    return float(qty_correct) / len(questions)
-
-
-# This is a corner case, where the lesson is time based, and you
-# could get 98% right, but you'll only have 1 star, because you took too long.
-# For these lessons types, we'll defer to the amount of stars.
-def get_fill_drill_score(completed_lesson_attempt, percent_correct):
-    stars = completed_lesson_attempt['stars']
-    if stars == 3:
-        return percent_correct
-    if stars == 2:
-        return .8
-    if stars == 1:
-        return .7
-    return .6
-
-
-# These lessons/questions are a corner case. They are atypical as far as datastructures
-# returned by the API. They include counting/hands, counting/flashcards, dice, ropeclimb and
-# other time based exercises, or ones with lots of rote practice, eg 80 rapid fire questions.
-def get_percent_rote_questions_correct(completed_lesson_attempt):
-    result_type = lesson_chapter_dict[
-        completed_lesson_attempt['objectID']]['setList']['resultType']
-    qty_correct = completed_lesson_attempt['progress']['problems'][0][
-        'customState']['numCorrect']
-    qty_questions = len(
-        completed_lesson_attempt['progress']['problems'][0]['trials'])
-    percent_correct = float(qty_correct / qty_questions)
+def compute_rote_correct_rate(attempt, lesson_map):
+    obj_id = attempt['objectID']
+    result_type = lesson_map[obj_id]['setList']['resultType']
+    problems = attempt['progress']['problems'][0]
+    num_correct = problems['customState']['numCorrect']
+    total = len(problems['trials'])
+    base_rate = float(num_correct) / total if total else 0.0
     if result_type == 'fillDrill':
-        return get_fill_drill_score(completed_lesson_attempt, percent_correct)
-    return percent_correct
+        return compute_fill_drill_score(attempt, base_rate)
+    return base_rate
 
-
-# Take a lesson, and analyze the percent correct, for the last 3 tries, then return a float.
-def get_percent_lessons_correct(completed_lesson_attempts, last_tries=3):
-    # How many questions are there total in the lesson
-    completed_lesson_attempt_scores = []
-    for completed_lesson_attempt in completed_lesson_attempts[:last_tries]:
-        questions = completed_lesson_attempt['progress']['problems']
-        # This 'G' means it's a weird corner case
-        if completed_lesson_attempt['setNumber'] == 'G':
-            questions_score = get_percent_rote_questions_correct(
-                completed_lesson_attempt)
-            completed_lesson_attempt_scores.append(questions_score)
-            continue
-        questions_score = get_percent_questions_correct(questions)
-        completed_lesson_attempt_scores.append(questions_score)
-    if len(completed_lesson_attempt_scores) == 0:
-        return 0
-    average_correct_last_tries = sum(completed_lesson_attempt_scores) / len(
-        completed_lesson_attempt_scores)
-    return round(average_correct_last_tries, 3)
-
-
-# Take an array of lessons, and remove any that aren't completed, then return the remainder.
-# BA seems to generate a lesson, if you click on it in the app, then never do any questions
-# Those get thrown away, also if you don't complete a lesson, we ignore those results
-def get_completed_lessons(lessons):
-    completed_lessons = []
-    for lesson in lessons:
-        if 'finishStatus' in lesson and lesson['finishStatus'] == 'completed':
-            completed_lessons.append(lesson)
-    return completed_lessons
-
-
-# return a string, with the datetime for the last lesson
-def get_last_lesson_datetime(completed_lesson_attempts):
-    if len(completed_lesson_attempts
-           ) > 0 and 'finishedAt' in completed_lesson_attempts[0]:
-        return completed_lesson_attempts[0]['finishedAt'][:-8]
-    return '................'
-
-
-def get_fastest_lesson_time(lesson, chapter_report):
-    time = 'none'
-    if 'results' not in chapter_report[lesson]:
-        return time
-    for lesson_result in chapter_report[lesson]['results']:
-        # this ensures we only check lesson times for completed lessons
-        if lesson_result['percentComplete'] != 1:
-            continue
-        lesson_time_spent_secs = float(lesson_result['timeSpent'])
-        mins = round(lesson_time_spent_secs / 60)
-        if time == 'none':
-            time = mins
-        if mins < time:
-            time = mins
-    return str(time)
-
-
-# This takes a datastructure as the input that we get from get_chapter_report
-# Then we'll feed it the results from say the Counting chapter (78)
-# This function will print any lessons that are below mastery learning (90%)
-# for the last 3 tries on average.
-def get_unmastered_lessons(chapter_report,
-                           chapter_id,
-                           min_lessons=3,
-                           mastery_percent=.832,
-                           get_mastered_qty=False):
-    lessons = chapter_report.keys()
-    lesson_report_messages = {}
-    mastered_lessons = 0
-    for lesson in lessons:
-        lesson_id = chapter_report[lesson]['blockID']
-        level_name = get_level_name(chapter_id)
-        if lesson == 'test':
-            continue
-        fastest_lesson_time = get_fastest_lesson_time(lesson, chapter_report)
-        lesson_name = lesson_chapter_dict[lesson_id]['displayName'].ljust(
-            25, ".")
-        chapter_name = lesson_chapter_dict[lesson_id]['chapter_name'].ljust(
-            25, ".")
-        if 'results' in chapter_report[lesson]:
-            lesson_attempted_tries = chapter_report[lesson]['results']
+def average_recent_attempts_score(attempts, lesson_map, last_n=3):
+    scores = []
+    for att in attempts[:last_n]:
+        if att.get('setNumber') == 'G':
+            scores.append(compute_rote_correct_rate(att, lesson_map))
         else:
-            lesson_attempted_tries = []
-        completed_lesson_attempts = get_completed_lessons(
-            lesson_attempted_tries)
-        # You have to do a lesson a minimum number of times to have sufficient data for measuring mastery
-        completed_lesson_attempts_qty = len(completed_lesson_attempts)
-        last_lesson_time = get_last_lesson_datetime(completed_lesson_attempts)
-        prefix = f"{last_lesson_time} {level_name} {chapter_name} {lesson_name} "
-        percent_correct = get_percent_lessons_correct(
-            completed_lesson_attempts)
-        fastest_time_msg = f'fastest time: {fastest_lesson_time} mins'.ljust(
-            25, " ")
-        if completed_lesson_attempts_qty < min_lessons:
-            attempts_msg = f'only worked on {completed_lesson_attempts_qty} attempts'.ljust(
-                27, " ")
-            lesson_report_messages[lesson_id] = {
-                'mastered':
-                False,
-                'msg':
-                f'{prefix} {attempts_msg} {fastest_time_msg} percent correct: {percent_correct * 100:.1f}'
-            }
+            questions = att.get('progress', {}).get('problems', [])
+            scores.append(compute_simple_correct_rate(questions))
+    if not scores:
+        return 0.0
+    return round(sum(scores) / len(scores), 3)
+
+def filter_completed(attempts):
+    return [a for a in attempts if a.get('finishStatus') == 'completed']
+
+def get_last_finished_time(attempts):
+    if not attempts:
+        return '................'
+    finished_at = attempts[0].get('finishedAt')
+    return finished_at[:-8] if finished_at else '................'
+
+def get_fastest_time_minute(lesson_key, chapter_report):
+    fastest = None
+    for res in chapter_report.get(lesson_key, {}).get('results', []):
+        if res.get('percentComplete') != 1:
             continue
-        # print out lessons which has the last 3 attempts below mastery
-        attempts_msg = f'avg on the last {min_lessons} attempts'.ljust(27, " ")
-        lesson_report_messages[lesson_id] = {
-            'msg':
-            f'{prefix} {attempts_msg} {fastest_time_msg} percent correct: {percent_correct * 100:.1f}'
-        }
-        if percent_correct < mastery_percent:
-            lesson_report_messages[lesson_id]['mastered'] = False
-        else:
-            lesson_report_messages[lesson_id]['mastered'] = True
+        secs = float(res.get('timeSpent', 0))
+        mins = round(secs / 60)
+        if fastest is None or mins < fastest:
+            fastest = mins
+    return str(fastest) if fastest is not None else 'none'
 
-            mastered_lessons += 1
-    if get_mastered_qty == True:
-        return mastered_lessons
-    return lesson_report_messages
+def find_unmastered_lessons(chapter_results, chapter_id, lesson_map, min_attempts=3, mastery_thresh=0.832, return_mastered_count=False):
+    messages = {}
+    mastered_count = 0
+    level_name = next((lvl for lvl, chs in ba_level_chapters_map.items() if chapter_id in chs), "NA")
 
+    for lesson_key, report in chapter_results.items():
+        if lesson_key == 'test':
+            continue
+        lesson_id = report['blockID']
+        chapter_name = lesson_map[lesson_id]['chapter_name']
+        completed = filter_completed(report.get('results', []))
+        last_time = get_last_finished_time(completed)
+        avg_score = average_recent_attempts_score(completed, lesson_map)
+        fastest = get_fastest_time_minute(lesson_key, chapter_results)
 
-# Look at the lessons available in the report, if there are 0 return False
-# otherwise if lessons have been started, and there is a report for the chapter
-# return True
-def is_chapter_started(chapter_report):
-    if 'statusCode' in chapter_report and chapter_report['statusCode'] == 403:
-        msg = f"################## ERROR {chapter_report['error']} {chapter_report['message']} ##################"
-        print(msg)
+        msg = (f"{last_time} {level_name} {chapter_name.ljust(25, '.')} "
+               f"{lesson_map[lesson_id]['displayName'].ljust(25, '.')} "
+               f"fastest: {fastest} mins, avg score: {avg_score*100:.1f}% ")
+
+        mastered = (avg_score >= mastery_thresh and len(completed) >= min_attempts)
+        messages[lesson_id] = {'msg': msg, 'mastered': mastered}
+        if mastered:
+            mastered_count += 1
+
+    return (mastered_count if return_mastered_count else messages)
+
+def chapter_started(chapter_report):
+    if chapter_report.get('statusCode') == 403:
+        err = chapter_report.get('error', '')
+        msg = chapter_report.get('message', '')
+        print(f"ERROR {err} {msg}")
         sys.exit(1)
-    qty_lessons_started = len(
-        chapter_report['students'][str(student_id)]['byBlockNumber'].keys())
-    if qty_lessons_started == 0:
-        return False
-    return True
+    student_str = str(student_id)
+    lessons = chapter_report['students'][student_str]['byBlockNumber']
+    return bool(lessons)
 
+def collect_active_chapter_reports():
+    reports = []
+    for level in ba_level_chapters_map:
+        for chap_id in ba_level_chapters_map[level]:
+            rep = fetch_chapter_report(chap_id)
+            if not chapter_started(rep):
+                return reports
+            reports.append(rep)
+    return reports
 
-# get the level name for a lesson_id
-def get_level_name(lesson_id):
-    level_name = 'NA'
-    for level in ba_level_chapters_map.keys():
-        if lesson_id in ba_level_chapters_map[level]:
-            level_name = level
-            break
-    return level
+def extract_chapter_ids(reports):
+    return [r['students'][str(student_id)]['chapterTotals']['chapterID'] for r in reports]
 
+def print_lessons(unmastered, level_info):
+    for level in level_info['chapters']:
+        for block in level_info['chapters'][level]['blocks']:
+            lid = block['id']
+            chapter_id = int(level)
+            entry = unmastered.get(lid)
+            if not entry:
+                continue
+            master = entry['mastered']
+            color = Fore.GREEN if master else Fore.RED
+            print(color + entry['msg'])
 
-# Take an array of chapter report data structures, then return an array of
-# chapter ids (integers)
-def get_chapter_ids(chapter_reports):
-    chapter_ids = []
-    for chapter_report in chapter_reports:
-        chapter_id = chapter_report['students'][str(
-            student_id)]['chapterTotals']['chapterID']
-        chapter_ids.append(chapter_id)
-    return chapter_ids
+def main(args):
+    if args.chapter:
+        cid = int(args.chapter)
+        rep = fetch_chapter_report(cid)
+        if not chapter_started(rep):
+            print("Chapter has not been started")
+            sys.exit()
+        reports = [rep]
+    else:
+        reports = collect_active_chapter_reports()
 
+    chapter_ids = extract_chapter_ids(reports)
+    lvl_info = fetch_level_info(chapter_ids)
+    lesson_map = map_lesson_to_chapter(lvl_info)
 
-# This parses all levels, then all the chapters from the levels, looking
-# for chapters that have not been started yet, then we stop parsing new chapter
-# and return the active chapter reports
-def get_all_active_chapter_reports(ba_level_chapters_map):
-    chapter_reports = []
-    for ba_level in ba_level_chapters_map.keys():
-        for chapter_id in ba_level_chapters_map[ba_level]:
-            chapter_report = get_chapter_report(chapter_id)
-            if is_chapter_started(chapter_report) is False:
-                break
-            chapter_reports.append(chapter_report)
-        if is_chapter_started(chapter_report) is False:
-            break
-    return chapter_reports
+    all_unmastered = {}
+    mastered_total = 0
+    for rep in reports:
+        cid = rep['students'][str(student_id)]['chapterTotals']['chapterID']
+        chapter_results = rep['students'][str(student_id)]['byBlockNumber']
+        um = find_unmastered_lessons(chapter_results, cid, lesson_map)
+        all_unmastered[cid] = um
+        mastered_total += find_unmastered_lessons(chapter_results, cid, lesson_map, return_mastered_count=True)
 
+    print_lessons({**{lid: v for chap in all_unmastered.values() for lid, v in chap.items()}}, lvl_info)
 
-def main():
-    unmastered_chapter_messages = {}
-    for chapter_report in all_chapter_reports:
-        chapter_id = chapter_report['students'][str(
-            student_id)]['chapterTotals']['chapterID']
-        unmastered_chapter_messages[chapter_id] = get_unmastered_lessons(
-            chapter_report['students'][str(student_id)]['byBlockNumber'],
-            chapter_id)
-    return unmastered_chapter_messages
+    if args.chapter:
+        lesson_qty = len(lvl_info['chapters'][args.chapter]['blocks']) - 1
+        print(f"{mastered_total} out of {lesson_qty} lessons mastered.")
 
-
-def print_unmastered_lessons(unmastered_lessons_messages,
-                             level_chapter_metadata):
-    # I'll print the lessons, in the order they appear on the platform
-    for chapter in level_chapter_metadata['chapters'].keys():
-        chapter_int = int(chapter)
-        if unmastered_lessons_messages[chapter_int] == {}:
-            continue
-        for lesson in level_chapter_metadata['chapters'][chapter]['blocks']:
-            lesson_id = lesson['id']
-            if lesson_id in unmastered_lessons_messages[chapter_int]:
-                if unmastered_lessons_messages[chapter_int][lesson_id][
-                        'mastered'] == True:
-                    print(Fore.GREEN + unmastered_lessons_messages[chapter_int]
-                          [lesson_id]['msg'])
-                else:
-                    print(Fore.RED + unmastered_lessons_messages[chapter_int]
-                          [lesson_id]['msg'])
-
-
-def main_with_args(args):
-    chapter_id = int(args.chapter)
-    chapter_report = get_chapter_report(chapter_id)
-    if is_chapter_started(chapter_report) is False:
-        print("Chapter has not been started")
-        sys.exit()
-    return [chapter_report]
-
-
-parser = argparse.ArgumentParser(
-    description="Run specific functions based on flags")
-parser.add_argument("--chapter",
-                    type=str,
-                    help="Specify the chapter to get report")
-args = parser.parse_args()
-
-if args.chapter:
-    all_chapter_reports = main_with_args(args)
-else:
-    all_chapter_reports = get_all_active_chapter_reports(ba_level_chapters_map)
-
-active_chapter_ids = get_chapter_ids(all_chapter_reports)
-level_chapter_metadata = get_level_info(active_chapter_ids)
-lesson_chapter_dict = get_lesson_chapter_dict(level_chapter_metadata)
-unmastered_lessons = main()
-
-# This if statement tells me how many of the lessons from the chapter were mastered.
-if args.chapter:
-    chapter_id = int(args.chapter)
-    # it's a -1, because the test is removed.
-    lesson_qty = len(
-        level_chapter_metadata['chapters'][args.chapter]['blocks']) - 1
-    chapter_report = all_chapter_reports[0]['students'][str(
-        student_id)]['byBlockNumber']
-    mastered_lessons = get_unmastered_lessons(chapter_report,
-                                              chapter_id,
-                                              get_mastered_qty=True)
-    print(f"{mastered_lessons} out of {lesson_qty} lessons mastered.")
-print_unmastered_lessons(unmastered_lessons, level_chapter_metadata)
-
-# If they give 2 stars, and my score is >90%, I should down weight my score.
-# print out the score for a lesson, even if it's >85%, but use green/red/yellow colors?
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Generate Beast Academy mastery report")
+    parser.add_argument("--chapter", type=str, help="Chapter ID to report on")
+    args = parser.parse_args()
+    main(args)
